@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hangman</title>
+<style>
+  :root {
+    --bg: #0f1320;
+    --panel: #1a2034;
+    --panel-2: #232b45;
+    --ink: #e8ecf7;
+    --muted: #8b94b3;
+    --accent: #5b8cff;
+    --good: #34d399;
+    --bad: #f87171;
+    --warn: #fbbf24;
+    --line: #2c3759;
+    --rope: #c9a36b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 800px at 50% -10%, #1c2440, var(--bg));
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100%;
+    padding: 24px 16px 48px;
+  }
+  h1 { font-size: 2rem; letter-spacing: 2px; margin: 8px 0 4px; }
+  h1 .accent { color: var(--accent); }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: .95rem; }
+  .card {
+    width: 100%; max-width: 760px;
+    background: linear-gradient(180deg, var(--panel), #161b2c);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  }
+  .hidden { display: none !important; }
+
+  label { display: block; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 18px 0 8px; }
+  input[type=text], input[type=number], input[type=password] {
+    width: 100%; padding: 14px 16px; font-size: 1.05rem;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+    color: var(--ink); outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+
+  .seg { display: flex; gap: 8px; background: var(--panel-2); padding: 6px; border-radius: 14px; border: 1px solid var(--line); }
+  .seg button {
+    flex: 1; padding: 14px; border: none; border-radius: 10px; cursor: pointer;
+    background: transparent; color: var(--muted); font-size: .95rem; font-weight: 600;
+    transition: .15s;
+  }
+  .seg button.active { background: var(--accent); color: white; box-shadow: 0 6px 18px rgba(91,140,255,.35); }
+
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 160px; }
+
+  .btn {
+    margin-top: 22px; width: 100%; padding: 16px; font-size: 1.05rem; font-weight: 700;
+    border: none; border-radius: 12px; cursor: pointer;
+    background: var(--accent); color: white; transition: .15s; letter-spacing: .5px;
+  }
+  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn.ghost { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .hint { color: var(--muted); font-size: .85rem; margin-top: 10px; line-height: 1.5; }
+
+  /* Game layout */
+  .game-top { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  svg.gallows { width: 240px; height: 260px; flex: 0 0 auto; }
+  .status { flex: 1; min-width: 220px; }
+  .turn-tag {
+    display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: 700;
+    background: var(--panel-2); border: 1px solid var(--line); margin-bottom: 10px;
+  }
+  .lives { font-size: .9rem; color: var(--muted); margin: 4px 0 14px; }
+  .lives b { color: var(--ink); }
+
+  .word { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; justify-content: center; }
+  .word .group { display: flex; gap: 8px; }
+  .word .space { width: 18px; }
+  .slot {
+    width: 34px; height: 46px; display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; font-weight: 700; border-bottom: 3px solid var(--line);
+    text-transform: uppercase;
+  }
+  .slot.filled { border-bottom-color: var(--good); animation: pop .2s ease; }
+  .slot.reveal { color: var(--bad); border-bottom-color: var(--bad); }
+  .slot.punct { border-bottom: none; color: var(--muted); }
+  @keyframes pop { from { transform: scale(.6); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+
+  .keyboard { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; align-items: center; }
+  .keyboard .krow { display: flex; gap: 8px; justify-content: center; }
+  .key {
+    width: 44px; height: 52px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--ink); font-size: 1.1rem; font-weight: 700;
+    cursor: pointer; transition: .12s;
+  }
+  .key:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-2px); }
+  .key.good { background: rgba(52,211,153,.18); border-color: var(--good); color: var(--good); }
+  .key.bad { background: rgba(248,113,113,.15); border-color: var(--bad); color: var(--bad); }
+  .key:disabled { cursor: not-allowed; }
+
+  .wrong { text-align: center; color: var(--muted); font-size: .9rem; margin-top: 16px; min-height: 1.2em; }
+  .wrong span { color: var(--bad); font-weight: 700; letter-spacing: 2px; }
+
+  /* Scoreboard */
+  .scores { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+  .pchip {
+    padding: 8px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line);
+    font-size: .85rem;
+  }
+  .pchip.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(91,140,255,.25); }
+  .pchip b { color: var(--good); }
+
+  /* End screen */
+  .end { text-align: center; }
+  .end .big { font-size: 2.4rem; font-weight: 800; margin: 6px 0; }
+  .end .win { color: var(--good); }
+  .end .lose { color: var(--bad); }
+  .end .phrase { font-size: 1.5rem; margin: 14px 0; letter-spacing: 1px; }
+  .end .phrase b { color: var(--accent); }
+
+  .center { text-align: center; }
+  .toprow { display:flex; justify-content: space-between; align-items:center; gap:12px; }
+  .small-link { background:none; border:none; color: var(--muted); cursor:pointer; font-size:.85rem; text-decoration: underline; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border:1px solid var(--line); padding: 12px 20px; border-radius: 12px;
+    opacity: 0; transition: .3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ---- End-screen drama ---- */
+  .end .big { display: inline-block; }
+  .celebrate .big { animation: bounceIn .6s cubic-bezier(.18,.89,.32,1.28) both; }
+  .celebrate .win {
+    background: linear-gradient(90deg,#34d399,#5b8cff,#fbbf24,#34d399);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    animation: hue 2.5s linear infinite;
+  }
+  .commiserate { animation: shake .5s cubic-bezier(.36,.07,.19,.97) both; }
+  .commiserate .big { animation: dropIn .5s ease both; }
+  .frowny { display: inline-block; animation: wobble 1.2s ease-in-out infinite; }
+  .sadface { animation: sag 1.4s ease-in-out infinite; transform-origin: 150px 63px; }
+
+  @keyframes bounceIn { 0%{transform:scale(.3);opacity:0} 60%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
+  @keyframes dropIn { 0%{transform:translateY(-28px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+  @keyframes hue { to { background-position: 300% 0; } }
+  @keyframes shake {
+    10%,90%{transform:translateX(-2px)} 20%,80%{transform:translateX(4px)}
+    30%,50%,70%{transform:translateX(-8px)} 40%,60%{transform:translateX(8px)}
+  }
+  @keyframes wobble { 0%,100%{transform:rotate(-9deg)} 50%{transform:rotate(9deg)} }
+  @keyframes sag { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+
+  /* ---- Confetti ---- */
+  #confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 50; }
+  .confetto { position: absolute; top: -16px; width: 10px; height: 14px; border-radius: 2px; will-change: transform, opacity; }
+  @keyframes fall {
+    0% { transform: translateY(-20px) rotateZ(0deg); opacity: 1; }
+    100% { transform: translateY(102vh) rotateZ(720deg); opacity: 1; }
+  }
+
+  /* ---- Phone layout ---- */
+  @media (max-width: 560px) {
+    body { padding: 16px 10px 40px; }
+    h1 { font-size: 1.6rem; }
+    .card { padding: 18px 14px; border-radius: 14px; }
+    .key { width: 9vw; max-width: 44px; height: 50px; font-size: 1rem; }
+    .keyboard .krow { gap: 6px; }
+    svg.gallows { width: 200px; height: 220px; }
+    .slot { width: 26px; height: 38px; font-size: 1.25rem; }
+    .word { gap: 7px; }
+    .word .group { gap: 5px; }
+    .seg button { padding: 12px 6px; font-size: .85rem; }
+  }
+  @media (hover: none) {
+    .key:hover:not(:disabled) { transform: none; } /* avoid sticky hover on touch */
+  }
+</style>
+</head>
+<body>
+  <h1>HANG<span class="accent">MAN</span></h1>
+  <p class="sub">One sets the phrase — the others guess letter by letter.</p>
+
+  <!-- ============ SETUP ============ -->
+  <div id="setup" class="card">
+    <label>Mode</label>
+    <div class="seg" id="modeSeg">
+      <button data-mode="single" class="active">Single guesser</button>
+      <button data-mode="multi">Multiple guessers</button>
+    </div>
+
+    <div id="multiOpts" class="hidden">
+      <label>How many guessers?</label>
+      <input type="number" id="numGuessers" value="2" min="2" max="8">
+      <div class="hint">Guessers take turns picking letters. They share one hangman — win or lose together, but we'll track who landed the most letters.</div>
+    </div>
+
+    <label id="phraseLabel">Secret phrase (the setter types this)</label>
+    <input type="password" id="phrase" placeholder="e.g.  the quick brown fox" autocomplete="off" spellcheck="false">
+    <div class="toprow">
+      <div class="hint">Letters are hidden as you type so guessers can't peek. Spaces &amp; punctuation are shown for free.</div>
+      <button class="small-link" id="peekBtn" type="button">show</button>
+    </div>
+
+    <label>Wrong guesses allowed</label>
+    <div class="seg" id="livesSeg">
+      <button data-lives="6" class="active">6 (classic)</button>
+      <button data-lives="8">8 (easy)</button>
+      <button data-lives="4">4 (hard)</button>
+    </div>
+
+    <button class="btn" id="startBtn">Start game</button>
+    <div class="hint" id="setupErr" style="color:var(--bad)"></div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div id="game" class="card hidden">
+    <div class="toprow">
+      <div class="turn-tag" id="turnTag">Guessing</div>
+      <button class="small-link" id="quitBtn" type="button">quit to menu</button>
+    </div>
+
+    <div class="game-top">
+      <svg class="gallows" viewBox="0 0 240 260" id="gallows" aria-label="hangman drawing"></svg>
+      <div class="status">
+        <div class="lives">Wrong guesses: <b id="wrongCount">0</b> / <span id="maxLives">6</span></div>
+        <div class="scores" id="scores"></div>
+      </div>
+    </div>
+
+    <div class="word" id="wordDisplay"></div>
+
+    <div class="keyboard" id="keyboard"></div>
+    <div class="wrong" id="wrongList"></div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div id="end" class="card hidden">
+    <div class="end">
+      <div class="big" id="endTitle"></div>
+      <div class="phrase">The phrase was<br><b id="endPhrase"></b></div>
+      <div id="endScores"></div>
+      <button class="btn hidden" id="retryBtn">Try again (same phrase)</button>
+      <button class="btn ghost" id="againSameBtn">New round (same players)</button>
+      <button class="btn ghost" id="menuBtn">Back to menu</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div id="confetti"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- State ----------
+  const S = {
+    mode: "single",
+    maxLives: 6,
+    phrase: "",
+    guessers: 1,
+    turn: 0,          // index of current guesser
+    wrong: 0,
+    guessed: new Set(),   // letters guessed (upper)
+    scores: [],       // correct-letter count per guesser
+    over: false,
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Setup interactions ----------
+  $("modeSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    [...e.currentTarget.children].forEach(c => c.classList.remove("active"));
+    b.classList.add("active");
+    S.mode = b.dataset.mode;
+    $("multiOpts").classList.toggle("hidden", S.mode !== "multi");
+  });
+
+  $("livesSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    [...e.currentTarget.children].forEach(c => c.classList.remove("active"));
+    b.classList.add("active");
+    S.maxLives = +b.dataset.lives;
+  });
+
+  $("peekBtn").addEventListener("click", () => {
+    const inp = $("phrase");
+    const show = inp.type === "password";
+    inp.type = show ? "text" : "password";
+    $("peekBtn").textContent = show ? "hide" : "show";
+  });
+
+  $("startBtn").addEventListener("click", startGame);
+
+  function startGame() {
+    const phrase = $("phrase").value.trim();
+    const err = $("setupErr");
+    if (!/[a-zA-Z]/.test(phrase)) { err.textContent = "Enter a phrase with at least one letter."; return; }
+    if (phrase.length > 60) { err.textContent = "Keep it under 60 characters."; return; }
+    err.textContent = "";
+
+    S.phrase = phrase;
+    S.guessers = S.mode === "multi" ? Math.max(2, Math.min(8, +$("numGuessers").value || 2)) : 1;
+    S.turn = 0;
+    S.wrong = 0;
+    S.guessed = new Set();
+    S.scores = Array(S.guessers).fill(0);
+    S.over = false;
+
+    // reset the password field for next time
+    $("phrase").value = "";
+    $("phrase").type = "password";
+    $("peekBtn").textContent = "show";
+
+    show("game");
+    $("maxLives").textContent = S.maxLives;
+    buildKeyboard();
+    render();
+  }
+
+  // ---------- Screen switching ----------
+  function show(which) {
+    ["setup", "game", "end"].forEach(s => $(s).classList.toggle("hidden", s !== which));
+  }
+
+  $("quitBtn").addEventListener("click", () => show("setup"));
+  $("menuBtn").addEventListener("click", () => show("setup"));
+  $("againSameBtn").addEventListener("click", () => show("setup"));
+  $("retryBtn").addEventListener("click", retrySamePhrase);
+
+  // Replay the same secret phrase with fresh guesses (only offered after a loss,
+  // since a loss never reveals the answer).
+  function retrySamePhrase() {
+    S.turn = 0;
+    S.wrong = 0;
+    S.guessed = new Set();
+    S.scores = Array(S.guessers).fill(0);
+    S.over = false;
+    show("game");
+    $("maxLives").textContent = S.maxLives;
+    buildKeyboard();
+    render();
+  }
+
+  // ---------- Keyboard ----------
+  const ROWS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+  function buildKeyboard() {
+    const kb = $("keyboard");
+    kb.innerHTML = "";
+    ROWS.forEach(row => {
+      const div = document.createElement("div");
+      div.className = "krow";
+      [...row].forEach(ch => {
+        const k = document.createElement("button");
+        k.className = "key";
+        k.textContent = ch;
+        k.dataset.letter = ch;
+        k.addEventListener("click", () => guess(ch));
+        div.appendChild(k);
+      });
+      kb.appendChild(div);
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if ($("game").classList.contains("hidden")) return;
+    const ch = e.key.toUpperCase();
+    if (/^[A-Z]$/.test(ch)) guess(ch);
+  });
+
+  // ---------- Core guess logic ----------
+  function guess(letter) {
+    if (S.over) return;
+    letter = letter.toUpperCase();
+    if (S.guessed.has(letter)) return;
+    S.guessed.add(letter);
+
+    const inPhrase = S.phrase.toUpperCase().includes(letter);
+    if (inPhrase) {
+      // count occurrences toward current guesser's score
+      const count = [...S.phrase.toUpperCase()].filter(c => c === letter).length;
+      S.scores[S.turn] += count;
+      toast(`${letter} — ${count} hit${count > 1 ? "s" : ""}!`);
+    } else {
+      S.wrong++;
+      // wrong guess passes the turn in multiplayer
+      if (S.mode === "multi") S.turn = (S.turn + 1) % S.guessers;
+      toast(`No ${letter}…`);
+    }
+
+    checkEnd();
+    render();
+  }
+
+  function isSolved() {
+    const up = S.phrase.toUpperCase();
+    for (const ch of up) {
+      if (/[A-Z]/.test(ch) && !S.guessed.has(ch)) return false;
+    }
+    return true;
+  }
+
+  function checkEnd() {
+    if (isSolved()) { S.over = true; endGame(true); }
+    else if (S.wrong >= S.maxLives) { S.over = true; endGame(false); }
+  }
+
+  // ---------- Rendering ----------
+  function render() {
+    $("wrongCount").textContent = S.wrong;
+    drawGallows(S.wrong, S.maxLives);
+    renderWord(false);
+    renderKeys();
+    renderWrongList();
+    renderTurn();
+    renderScores();
+  }
+
+  function renderWord(revealAll) {
+    const wd = $("wordDisplay");
+    wd.innerHTML = "";
+    const words = S.phrase.split(" ");
+    words.forEach((word, wi) => {
+      const g = document.createElement("div");
+      g.className = "group";
+      [...word].forEach(ch => {
+        const slot = document.createElement("div");
+        const upper = ch.toUpperCase();
+        if (/[A-Z]/.test(upper)) {
+          const known = S.guessed.has(upper);
+          slot.className = "slot" + (known ? " filled" : (revealAll ? " reveal" : ""));
+          slot.textContent = (known || revealAll) ? ch : "";
+        } else {
+          slot.className = "slot punct";
+          slot.textContent = ch;
+        }
+        g.appendChild(slot);
+      });
+      wd.appendChild(g);
+      if (wi < words.length - 1) {
+        const sp = document.createElement("div");
+        sp.className = "space";
+        wd.appendChild(sp);
+      }
+    });
+  }
+
+  function renderKeys() {
+    document.querySelectorAll(".key").forEach(k => {
+      const L = k.dataset.letter;
+      k.classList.remove("good", "bad");
+      k.disabled = false;
+      if (S.guessed.has(L)) {
+        k.disabled = true;
+        if (S.phrase.toUpperCase().includes(L)) k.classList.add("good");
+        else k.classList.add("bad");
+      }
+      if (S.over) k.disabled = true;
+    });
+  }
+
+  function renderWrongList() {
+    const wrong = [...S.guessed].filter(L => !S.phrase.toUpperCase().includes(L));
+    $("wrongList").innerHTML = wrong.length
+      ? `Misses: <span>${wrong.join(" ")}</span>`
+      : "";
+  }
+
+  function renderTurn() {
+    const tag = $("turnTag");
+    if (S.mode === "multi") {
+      tag.textContent = `Guesser ${S.turn + 1}'s turn`;
+      tag.style.display = "inline-block";
+    } else {
+      tag.textContent = "Pick a letter";
+    }
+  }
+
+  function renderScores() {
+    const box = $("scores");
+    if (S.mode !== "multi") { box.innerHTML = ""; return; }
+    box.innerHTML = "";
+    S.scores.forEach((sc, i) => {
+      const chip = document.createElement("div");
+      chip.className = "pchip" + (i === S.turn && !S.over ? " active" : "");
+      chip.innerHTML = `Guesser ${i + 1}: <b>${sc}</b>`;
+      box.appendChild(chip);
+    });
+  }
+
+  // ---------- End screen ----------
+  function endGame(won) {
+    renderWord(won); // only reveal unguessed letters on a win
+    renderKeys();
+    setTimeout(() => {
+      $("endTitle").innerHTML = won
+        ? '<span class="win">SOLVED! 🎉</span>'
+        : '<span class="lose">GAME OVER <span class="frowny">🙁</span></span>';
+      const endCard = $("end");
+      endCard.classList.remove("celebrate", "commiserate");
+      void endCard.offsetWidth; // restart CSS animation
+      endCard.classList.add(won ? "celebrate" : "commiserate");
+      if (won) launchConfetti();
+      const pl = $("endPhrase").closest(".phrase");
+      if (won) {
+        pl.innerHTML = 'The phrase was<br><b id="endPhrase"></b>';
+        $("endPhrase").textContent = S.phrase;
+      } else {
+        pl.innerHTML = "The phrase stays a secret — better luck next round.";
+      }
+      // Offer a retry of the same phrase only after a loss (win reveals the answer).
+      $("retryBtn").classList.toggle("hidden", won);
+
+      const es = $("endScores");
+      if (S.mode === "multi") {
+        const max = Math.max(...S.scores);
+        const winners = S.scores
+          .map((s, i) => ({ s, i }))
+          .filter(o => o.s === max && o.s > 0)
+          .map(o => `Guesser ${o.i + 1}`);
+        const rows = S.scores
+          .map((s, i) => `<div class="pchip">Guesser ${i + 1}: <b>${s}</b> letters</div>`)
+          .join(" ");
+        const mvp = winners.length
+          ? `<p class="hint">Most letters: <b style="color:var(--good)">${winners.join(", ")}</b> (${max})</p>`
+          : "";
+        es.innerHTML = `<div class="scores" style="margin:14px 0">${rows}</div>${mvp}`;
+      } else {
+        es.innerHTML = "";
+      }
+      show("end");
+    }, won ? 350 : 700);
+  }
+
+  // ---------- Hangman SVG ----------
+  // Draws progressively based on wrong/maxLives (scaled to 6 canonical parts).
+  function drawGallows(wrong, maxLives) {
+    const svg = $("gallows");
+    const C = "var(--ink)", R = "var(--rope)", L = "var(--line)";
+    // gallows structure (always visible)
+    let parts = `
+      <line x1="20" y1="240" x2="120" y2="240" stroke="${L}" stroke-width="6"/>
+      <line x1="50" y1="240" x2="50" y2="20" stroke="${L}" stroke-width="6"/>
+      <line x1="50" y1="20" x2="150" y2="20" stroke="${L}" stroke-width="6"/>
+      <line x1="150" y1="20" x2="150" y2="45" stroke="${R}" stroke-width="4"/>
+    `;
+    // 6 canonical body parts; scale how many are shown to current progress
+    const frac = wrong / maxLives;
+    const shown = Math.min(6, Math.round(frac * 6 + (wrong > 0 ? 0.0001 : 0)));
+    const body = [
+      `<circle cx="150" cy="63" r="18" stroke="${C}" stroke-width="4" fill="none"/>`,                 // head
+      `<line x1="150" y1="81" x2="150" y2="140" stroke="${C}" stroke-width="4"/>`,                     // torso
+      `<line x1="150" y1="95" x2="125" y2="120" stroke="${C}" stroke-width="4"/>`,                     // left arm
+      `<line x1="150" y1="95" x2="175" y2="120" stroke="${C}" stroke-width="4"/>`,                     // right arm
+      `<line x1="150" y1="140" x2="128" y2="175" stroke="${C}" stroke-width="4"/>`,                    // left leg
+      `<line x1="150" y1="140" x2="172" y2="175" stroke="${C}" stroke-width="4"/>`,                    // right leg
+    ];
+    for (let i = 0; i < shown; i++) parts += body[i];
+    // sad frowny face on death
+    if (wrong >= maxLives) {
+      parts += `
+        <g class="sadface">
+          <circle cx="144" cy="60" r="2.4" fill="${C}"/>
+          <circle cx="156" cy="60" r="2.4" fill="${C}"/>
+          <path d="M142 73 Q150 65 158 73" stroke="${C}" stroke-width="3" fill="none" stroke-linecap="round"/>
+        </g>`;
+    }
+    svg.innerHTML = parts;
+  }
+
+  // ---------- Confetti ----------
+  function launchConfetti() {
+    const root = $("confetti");
+    root.innerHTML = "";
+    const colors = ["#34d399", "#5b8cff", "#fbbf24", "#f87171", "#a78bfa", "#f472b6"];
+    const N = 120;
+    for (let i = 0; i < N; i++) {
+      const c = document.createElement("div");
+      c.className = "confetto";
+      const dur = 2.4 + Math.random() * 1.8;
+      c.style.left = Math.random() * 100 + "vw";
+      c.style.background = colors[i % colors.length];
+      c.style.animation = `fall ${dur}s linear ${Math.random() * 0.6}s forwards`;
+      if (Math.random() < 0.5) c.style.borderRadius = "50%";
+      c.style.opacity = (0.7 + Math.random() * 0.3).toFixed(2);
+      c.style.transform = `scale(${(0.6 + Math.random() * 0.9).toFixed(2)})`;
+      root.appendChild(c);
+    }
+    setTimeout(() => { root.innerHTML = ""; }, 5000);
+  }
+
+  // ---------- Toast ----------
+  let toastTimer;
+  function toast(msg) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1100);
+  }
+
+  // initial paint of empty gallows on setup is not needed; drawn on start.
+})();
+</script>
+</body>
+</html>
