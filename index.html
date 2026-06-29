@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1320">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Hangman</title>
 <style>
   :root {
@@ -18,16 +21,20 @@
     --line: #2c3759;
     --rope: #c9a36b;
   }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; }
   body {
     background: radial-gradient(1200px 800px at 50% -10%, #1c2440, var(--bg));
+    background-attachment: fixed;
     color: var(--ink);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     display: flex; flex-direction: column; align-items: center;
-    min-height: 100%;
-    padding: 24px 16px 48px;
+    min-height: 100dvh;
+    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(40px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    -webkit-text-size-adjust: 100%;
   }
+  button, .key, .seg button { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
   h1 { font-size: 2rem; letter-spacing: 2px; margin: 8px 0 4px; }
   h1 .accent { color: var(--accent); }
   .sub { color: var(--muted); margin: 0 0 20px; font-size: .95rem; }
@@ -95,12 +102,13 @@
   .slot.punct { border-bottom: none; color: var(--muted); }
   @keyframes pop { from { transform: scale(.6); opacity: .3; } to { transform: scale(1); opacity: 1; } }
 
-  .keyboard { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; align-items: center; }
-  .keyboard .krow { display: flex; gap: 8px; justify-content: center; }
+  .keyboard { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; align-items: center; width: 100%; }
+  .keyboard .krow { display: flex; gap: 6px; justify-content: center; width: 100%; }
   .key {
-    width: 44px; height: 52px; border-radius: 10px; border: 1px solid var(--line);
+    flex: 1 1 0; min-width: 0; max-width: 46px; height: 52px;
+    border-radius: 10px; border: 1px solid var(--line);
     background: var(--panel-2); color: var(--ink); font-size: 1.1rem; font-weight: 700;
-    cursor: pointer; transition: .12s;
+    cursor: pointer; transition: .12s; padding: 0;
   }
   .key:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-2px); }
   .key.good { background: rgba(52,211,153,.18); border-color: var(--good); color: var(--good); }
@@ -171,19 +179,27 @@
 
   /* ---- Phone layout ---- */
   @media (max-width: 560px) {
-    body { padding: 16px 10px 40px; }
-    h1 { font-size: 1.6rem; }
-    .card { padding: 18px 14px; border-radius: 14px; }
-    .key { width: 9vw; max-width: 44px; height: 50px; font-size: 1rem; }
-    .keyboard .krow { gap: 6px; }
-    svg.gallows { width: 200px; height: 220px; }
-    .slot { width: 26px; height: 38px; font-size: 1.25rem; }
-    .word { gap: 7px; }
-    .word .group { gap: 5px; }
-    .seg button { padding: 12px 6px; font-size: .85rem; }
+    h1 { font-size: 1.55rem; margin: 4px 0 2px; }
+    .sub { font-size: .85rem; margin-bottom: 14px; }
+    .card { padding: 16px 12px; border-radius: 14px; }
+    .keyboard .krow { gap: 5px; }
+    .key { height: 48px; font-size: 1.05rem; max-width: 40px; border-radius: 9px; }
+    .game-top { gap: 12px; }
+    svg.gallows { width: 180px; height: 200px; }
+    .word { gap: 6px; margin: 16px 0; }
+    .word .group { gap: 4px; }
+    .seg button { padding: 12px 6px; font-size: .82rem; }
+    label { margin-top: 14px; }
+    .btn { padding: 15px; }
+    .end .big { font-size: 1.9rem; }
+    .end .phrase { font-size: 1.2rem; }
+  }
+  /* Long phrases: let letter slots shrink to fit the row */
+  @media (max-width: 420px) {
+    .slot { width: clamp(18px, 7vw, 30px); height: 40px; font-size: clamp(1rem, 5.5vw, 1.5rem); }
   }
   @media (hover: none) {
-    .key:hover:not(:disabled) { transform: none; } /* avoid sticky hover on touch */
+    .key:hover:not(:disabled) { transform: none; border-color: var(--line); } /* no sticky hover on touch */
   }
 </style>
 </head>
@@ -201,7 +217,7 @@
 
     <div id="multiOpts" class="hidden">
       <label>How many guessers?</label>
-      <input type="number" id="numGuessers" value="2" min="2" max="8">
+      <input type="number" id="numGuessers" value="2" min="2" max="8" inputmode="numeric">
       <div class="hint">Guessers take turns picking letters. They share one hangman — win or lose together, but we'll track who landed the most letters.</div>
     </div>
 
